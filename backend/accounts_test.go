@@ -399,7 +399,7 @@ func TestCreateAccountsFailure3(t *testing.T) {
 	req.Storage = sm
 	_, err := b.HandleRequest(context.Background(), req)
 
-	assert.Equal("Error reconstructing private key from input hex", err.Error())
+	assert.Equal("error reconstructing private key from input hex", err.Error())
 }
 
 func TestReadAccountsFailure1(t *testing.T) {
@@ -477,7 +477,7 @@ func TestExportAccountsFailure2(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Account does not exist", err.Error())
+	assert.Equal("account does not exist", err.Error())
 }
 
 func TestDeleteAccountsFailure1(t *testing.T) {
@@ -546,7 +546,7 @@ func TestSignTxFailure2(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Error retrieving signing account 0xf809410b0d6f047c603deb311979cd413e025a84", err.Error())
+	assert.Equal("error retrieving signing account 0xf809410b0d6f047c603deb311979cd413e025a84", err.Error())
 }
 
 func TestSignTxFailure3(t *testing.T) {
@@ -561,7 +561,7 @@ func TestSignTxFailure3(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Signing account 0xf809410b0d6f047c603deb311979cd413e025a84 does not exist", err.Error())
+	assert.Equal("signing account 0xf809410b0d6f047c603deb311979cd413e025a84 does not exist", err.Error())
 }
 
 func TestSignTxFailure4(t *testing.T) {
@@ -577,7 +577,7 @@ func TestSignTxFailure4(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Invalid amount for the 'value' field", err.Error())
+	assert.Equal("invalid amount for the 'value' field", err.Error())
 }
 
 func TestSignTxFailure5(t *testing.T) {
@@ -593,7 +593,7 @@ func TestSignTxFailure5(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Invalid 'chainId' value", err.Error())
+	assert.Equal("invalid 'chainId' value", err.Error())
 }
 
 func TestSignTxFailure6(t *testing.T) {
@@ -609,7 +609,7 @@ func TestSignTxFailure6(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Invalid gas limit", err.Error())
+	assert.Equal("invalid gas limit", err.Error())
 }
 
 func TestSignTxFailure7(t *testing.T) {
@@ -624,7 +624,7 @@ func TestSignTxFailure7(t *testing.T) {
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("Error reconstructing private key from retrieved hex", err.Error())
+	assert.Equal("error reconstructing private key from retrieved hex", err.Error())
 }
 
 func TestEIP1559TxFailure1(t *testing.T) {

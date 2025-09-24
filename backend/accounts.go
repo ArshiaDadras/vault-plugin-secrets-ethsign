@@ -130,7 +130,7 @@ func (b *backend) readAccount(ctx context.Context, req *logical.Request, data *f
 		return nil, err
 	}
 	if account == nil {
-		return nil, fmt.Errorf("Account does not exist")
+		return nil, fmt.Errorf("account does not exist")
 	}
 
 	return &logical.Response{
@@ -148,7 +148,7 @@ func (b *backend) exportAccount(ctx context.Context, req *logical.Request, data 
 		return nil, err
 	}
 	if account == nil {
-		return nil, fmt.Errorf("Account does not exist")
+		return nil, fmt.Errorf("account does not exist")
 	}
 
 	return &logical.Response{
