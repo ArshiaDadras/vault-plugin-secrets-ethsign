@@ -290,13 +290,6 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 	}
 	nonce := nonceIn.Uint64()
 
-	privateKey, err := crypto.HexToECDSA(account.PrivateKey)
-	if err != nil {
-		b.Logger().Error("Error reconstructing private key from retrieved hex", "error", err)
-		return nil, fmt.Errorf("error reconstructing private key from retrieved hex")
-	}
-	defer ZeroKey(privateKey)
-
 	// Create appropriate transaction type
 	var tx *types.Transaction
 	if hasEIP1559Gas {
@@ -364,6 +357,13 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 	} else {
 		signer = types.NewEIP155Signer(chainId)
 	}
+
+	privateKey, err := crypto.HexToECDSA(account.PrivateKey)
+	if err != nil {
+		b.Logger().Error("Error reconstructing private key from retrieved hex", "error", err)
+		return nil, fmt.Errorf("error reconstructing private key from retrieved hex")
+	}
+	defer ZeroKey(privateKey)
 
 	signedTx, err := types.SignTx(tx, signer, privateKey)
 	if err != nil {

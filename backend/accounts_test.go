@@ -168,6 +168,7 @@ func TestAccounts(t *testing.T) {
 	req.Storage = storage
 	data := map[string]interface{}{
 		"data":     dataToSign,
+		"value":    1000,
 		"gas":      500000,
 		"nonce":    "0x2",
 		"gasPrice": 0,
@@ -199,6 +200,7 @@ func TestAccounts(t *testing.T) {
 	data = map[string]interface{}{
 		"data":     dataToSign,
 		"to":       "0xf809410b0d6f047c603deb311979cd413e025a84",
+		"value":    1000,
 		"gas":      50000,
 		"nonce":    "0x3",
 		"gasPrice": 0,
@@ -226,6 +228,7 @@ func TestAccounts(t *testing.T) {
 	data = map[string]interface{}{
 		"input":    dataToSign,
 		"to":       "0xf809410b0d6f047c603deb311979cd413e025a84",
+		"value":    1000,
 		"gas":      50000,
 		"nonce":    "0x3",
 		"gasPrice": 0,
@@ -242,6 +245,7 @@ func TestAccounts(t *testing.T) {
 	data = map[string]interface{}{
 		"data":                 dataToSign,
 		"to":                   "0xf809410b0d6f047c603deb311979cd413e025a84",
+		"value":                1000,
 		"gas":                  50000,
 		"nonce":                "0x4",
 		"maxFeePerGas":         "20000000000", // 20 gwei
@@ -737,6 +741,7 @@ func TestEIP1559TxFailure5(t *testing.T) {
 	req.Data["value"] = "1000"
 	req.Data["gas"] = "21000"
 	req.Data["maxFeePerGas"] = "2000"
+	req.Data["nonce"] = "10"
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
