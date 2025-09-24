@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -70,16 +71,16 @@ func (b *backend) createAccount(ctx context.Context, req *logical.Request, data 
 	var err error
 
 	if keyInput != "" {
-    re := regexp.MustCompile("[0-9a-fA-F]{64}$")
-    key := re.FindString(keyInput)
-    if key == "" {
-      b.Logger().Error("Input private key did not parse successfully", "privateKey", keyInput)
-      return nil, fmt.Errorf("privateKey must be a 32-byte hexidecimal string")
-    }
+		re := regexp.MustCompile("[0-9a-fA-F]{64}$")
+		key := re.FindString(keyInput)
+		if key == "" {
+			b.Logger().Error("Input private key did not parse successfully", "privateKey", keyInput)
+			return nil, fmt.Errorf("privateKey must be a 32-byte hexidecimal string")
+		}
 		privateKey, err = crypto.HexToECDSA(key)
 		if err != nil {
 			b.Logger().Error("Error reconstructing private key from input hex", "error", err)
-			return nil, fmt.Errorf("Error reconstructing private key from input hex")
+			return nil, fmt.Errorf("error reconstructing private key from input hex")
 		}
 		privateKeyString = key
 	} else {
@@ -180,7 +181,7 @@ func (b *backend) retrieveAccount(ctx context.Context, req *logical.Request, add
 	matched, err := regexp.MatchString("^(0x)?[0-9a-fA-F]{40}$", address)
 	if !matched || err != nil {
 		b.Logger().Error("Failed to retrieve the account, malformatted account address", "address", address, "error", err)
-		return nil, fmt.Errorf("Failed to retrieve the account, malformatted account address")
+		return nil, fmt.Errorf("failed to retrieve the account, malformatted account address")
 	} else {
 		// make sure the address has the "0x prefix"
 		if address[:2] != "0x" {
@@ -189,7 +190,7 @@ func (b *backend) retrieveAccount(ctx context.Context, req *logical.Request, add
 		path = fmt.Sprintf("accounts/%s", address)
 		entry, err := req.Storage.Get(ctx, path)
 		if err != nil {
-			b.Logger().Error("Failed to retrieve the account by address", "path", path, "error", err)
+			b.Logger().Error("failed to retrieve the account by address", "path", path, "error", err)
 			return nil, err
 		}
 		if entry == nil {
@@ -211,7 +212,7 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 	if dataInput == "" {
 		dataInput = data.Get("input").(string)
 	}
-	if len(dataInput) > 2 && dataInput[0:2] != "0x" {
+	if !strings.HasPrefix(dataInput, "0x") {
 		dataInput = "0x" + dataInput
 	}
 
@@ -224,15 +225,15 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 	account, err := b.retrieveAccount(ctx, req, from)
 	if err != nil {
 		b.Logger().Error("Failed to retrieve the signing account", "address", from, "error", err)
-		return nil, fmt.Errorf("Error retrieving signing account %s", from)
+		return nil, fmt.Errorf("error retrieving signing account %s", from)
 	}
 	if account == nil {
-		return nil, fmt.Errorf("Signing account %s does not exist", from)
+		return nil, fmt.Errorf("signing account %s does not exist", from)
 	}
 	amount := ValidNumber(data.Get("value").(string))
 	if amount == nil {
 		b.Logger().Error("Invalid amount for the 'value' field", "value", data.Get("value").(string))
-		return nil, fmt.Errorf("Invalid amount for the 'value' field")
+		return nil, fmt.Errorf("invalid amount for the 'value' field")
 	}
 
 	rawAddressTo := data.Get("to").(string)
@@ -240,42 +241,130 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 	chainId := ValidNumber(data.Get("chainId").(string))
 	if chainId == nil {
 		b.Logger().Error("Invalid chainId", "chainId", data.Get("chainId").(string))
-		return nil, fmt.Errorf("Invalid 'chainId' value")
+		return nil, fmt.Errorf("invalid 'chainId' value")
 	}
 
 	gasLimitIn := ValidNumber(data.Get("gas").(string))
 	if gasLimitIn == nil {
 		b.Logger().Error("Invalid gas limit", "gas", data.Get("gas").(string))
-		return nil, fmt.Errorf("Invalid gas limit")
+		return nil, fmt.Errorf("invalid gas limit")
 	}
 	gasLimit := gasLimitIn.Uint64()
 
+	// Handle EIP-1559 vs Legacy transaction fields
 	gasPrice := ValidNumber(data.Get("gasPrice").(string))
+	maxFeePerGas := ValidNumber(data.Get("maxFeePerGas").(string))
+	maxPriorityFeePerGas := ValidNumber(data.Get("maxPriorityFeePerGas").(string))
+
+	// Validate field combinations
+	hasLegacyGas := gasPrice != nil && gasPrice.Cmp(big.NewInt(0)) >= 0
+	hasEIP1559Gas := (maxFeePerGas != nil && maxFeePerGas.Cmp(big.NewInt(0)) >= 0) ||
+		(maxPriorityFeePerGas != nil && maxPriorityFeePerGas.Cmp(big.NewInt(0)) >= 0)
+
+	if hasLegacyGas && hasEIP1559Gas {
+		b.Logger().Error("Cannot specify both gasPrice and EIP-1559 fields (maxFeePerGas/maxPriorityFeePerGas)")
+		return nil, fmt.Errorf("cannot specify both gasPrice and EIP-1559 fields (maxFeePerGas/maxPriorityFeePerGas)")
+	} else if !hasEIP1559Gas && !hasLegacyGas {
+		b.Logger().Error("Must specify either gasPrice (for legacy tx) or maxFeePerGas/maxPriorityFeePerGas (for EIP-1559 tx)")
+		return nil, fmt.Errorf("must specify either gasPrice (for legacy tx) or maxFeePerGas/maxPriorityFeePerGas (for EIP-1559 tx)")
+	}
+
+	// For EIP-1559, both maxFeePerGas and maxPriorityFeePerGas should be provided
+	if hasEIP1559Gas {
+		if maxFeePerGas == nil || maxFeePerGas.Cmp(big.NewInt(0)) <= 0 {
+			b.Logger().Error("maxFeePerGas is required for EIP-1559 transactions")
+			return nil, fmt.Errorf("maxFeePerGas is required for EIP-1559 transactions")
+		}
+		if maxPriorityFeePerGas == nil {
+			maxPriorityFeePerGas = big.NewInt(0)
+		} else if maxPriorityFeePerGas.Cmp(maxFeePerGas) > 0 {
+			b.Logger().Error("maxPriorityFeePerGas cannot be greater than maxFeePerGas")
+			return nil, fmt.Errorf("maxPriorityFeePerGas cannot be greater than maxFeePerGas")
+		}
+	}
 
 	privateKey, err := crypto.HexToECDSA(account.PrivateKey)
 	if err != nil {
 		b.Logger().Error("Error reconstructing private key from retrieved hex", "error", err)
-		return nil, fmt.Errorf("Error reconstructing private key from retrieved hex")
+		return nil, fmt.Errorf("error reconstructing private key from retrieved hex")
 	}
 	defer ZeroKey(privateKey)
 
 	nonceIn := ValidNumber(data.Get("nonce").(string))
-	var nonce uint64
-	nonce = nonceIn.Uint64()
-
-	var tx *types.Transaction
-	if rawAddressTo == "" {
-		tx = types.NewContractCreation(nonce, amount, gasLimit, gasPrice, txDataToSign)
-	} else {
-		toAddress := common.HexToAddress(rawAddressTo)
-		tx = types.NewTransaction(nonce, toAddress, amount, gasLimit, gasPrice, txDataToSign)
+	if nonceIn == nil {
+		b.Logger().Error("Invalid nonce", "nonce", data.Get("nonce").(string))
+		return nil, fmt.Errorf("invalid nonce")
 	}
+	nonce := nonceIn.Uint64()
+
+	// Create appropriate transaction type
+	var tx *types.Transaction
+	if hasEIP1559Gas {
+		// EIP-1559 transaction (type 2)
+		if big.NewInt(0).Cmp(chainId) == 0 {
+			b.Logger().Error("Chain ID is required for EIP-1559 transactions")
+			return nil, fmt.Errorf("chain ID is required for EIP-1559 transactions")
+		}
+
+		if rawAddressTo == "" {
+			// Contract creation with EIP-1559
+			tx = types.NewTx(&types.DynamicFeeTx{
+				ChainID:   chainId,
+				Nonce:     nonce,
+				GasTipCap: maxPriorityFeePerGas,
+				GasFeeCap: maxFeePerGas,
+				Gas:       gasLimit,
+				To:        nil,
+				Value:     amount,
+				Data:      txDataToSign,
+			})
+		} else {
+			// Regular transaction with EIP-1559
+			toAddress := common.HexToAddress(rawAddressTo)
+			tx = types.NewTx(&types.DynamicFeeTx{
+				ChainID:   chainId,
+				Nonce:     nonce,
+				GasTipCap: maxPriorityFeePerGas,
+				GasFeeCap: maxFeePerGas,
+				Gas:       gasLimit,
+				To:        &toAddress,
+				Value:     amount,
+				Data:      txDataToSign,
+			})
+		}
+	} else {
+		// Legacy transaction (type 0)
+		if rawAddressTo == "" {
+			tx = types.NewTx(&types.LegacyTx{
+				Nonce:    nonce,
+				GasPrice: gasPrice,
+				Gas:      gasLimit,
+				To:       nil,
+				Value:    amount,
+				Data:     txDataToSign,
+			})
+		} else {
+			toAddress := common.HexToAddress(rawAddressTo)
+			tx = types.NewTx(&types.LegacyTx{
+				Nonce:    nonce,
+				GasPrice: gasPrice,
+				Gas:      gasLimit,
+				To:       &toAddress,
+				Value:    amount,
+				Data:     txDataToSign,
+			})
+		}
+	}
+
 	var signer types.Signer
 	if big.NewInt(0).Cmp(chainId) == 0 {
 		signer = types.HomesteadSigner{}
+	} else if hasEIP1559Gas {
+		signer = types.NewLondonSigner(chainId)
 	} else {
 		signer = types.NewEIP155Signer(chainId)
 	}
+
 	signedTx, err := types.SignTx(tx, signer, privateKey)
 	if err != nil {
 		b.Logger().Error("Failed to sign the transaction object", "error", err)
@@ -294,9 +383,6 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 }
 
 func ValidNumber(input string) *big.Int {
-	if input == "" {
-		return big.NewInt(0)
-	}
 	matched, err := regexp.MatchString("([0-9])", input)
 	if !matched || err != nil {
 		return nil

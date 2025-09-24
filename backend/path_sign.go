@@ -15,39 +15,45 @@ func pathSign(b *backend) *framework.Path {
 
     `,
 		Fields: map[string]*framework.FieldSchema{
-			"name": &framework.FieldSchema{Type: framework.TypeString},
-			"to": &framework.FieldSchema{
+			"name": {Type: framework.TypeString},
+			"to": {
 				Type:        framework.TypeString,
 				Description: "(optional when creating new contract) The contract address the transaction is directed to.",
 				Default:     "",
 			},
-			"data": &framework.FieldSchema{
+			"data": {
 				Type:        framework.TypeString,
 				Description: "The compiled code of a contract OR the hash of the invoked method signature and encoded parameters.",
 			},
-			"input": &framework.FieldSchema{
+			"input": {
 				Type:        framework.TypeString,
 				Description: "The compiled code of a contract OR the hash of the invoked method signature and encoded parameters.",
 			},
-			"value": &framework.FieldSchema{
+			"value": {
 				Type:        framework.TypeString,
-				Description: "(optional) Integer of the value sent with this transaction (in wei).",
+				Description: "Integer of the value sent with this transaction (in wei).",
 			},
-			"nonce": &framework.FieldSchema{
+			"nonce": {
 				Type:        framework.TypeString,
 				Description: "The transaction nonce.",
 			},
-			"gas": &framework.FieldSchema{
+			"gas": {
 				Type:        framework.TypeString,
-				Description: "(optional, default: 90000) Integer of the gas provided for the transaction execution. It will return unused gas",
-				Default:     "90000",
+				Description: "Integer of the gas provided for the transaction execution. It will return unused gas",
 			},
-			"gasPrice": &framework.FieldSchema{
+			"gasPrice": {
 				Type:        framework.TypeString,
-				Description: "(optional, default: 0) The gas price for the transaction in wei.",
-				Default:     "0",
+				Description: "(optional) The gas price for legacy transactions in wei. Mutually exclusive with maxFeePerGas/maxPriorityFeePerGas.",
 			},
-			"chainId": &framework.FieldSchema{
+			"maxFeePerGas": {
+				Type:        framework.TypeString,
+				Description: "(optional) Maximum fee per gas for EIP-1559 transactions in wei. Used with maxPriorityFeePerGas for EIP-1559 transactions.",
+			},
+			"maxPriorityFeePerGas": {
+				Type:        framework.TypeString,
+				Description: "(optional) Maximum priority fee per gas (tip) for EIP-1559 transactions in wei. Used with maxFeePerGas for EIP-1559 transactions.",
+			},
+			"chainId": {
 				Type:        framework.TypeString,
 				Description: "(optional) Chain ID of the target blockchain network. If present, EIP155 signer will be used to sign. If omitted, Homestead signer will be used.",
 				Default:     "0",

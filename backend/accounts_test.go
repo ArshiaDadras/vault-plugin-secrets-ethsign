@@ -179,9 +179,11 @@ func TestAccounts(t *testing.T) {
 	}
 	signedTx := resp.Data["signed_transaction"].(string)
 	signatureBytes, err := hexutil.Decode(signedTx)
-	var tx types.Transaction
-	err = tx.DecodeRLP(rlp.NewStream(bytes.NewReader(signatureBytes), 0))
 	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	var tx types.Transaction
+	if err = tx.DecodeRLP(rlp.NewStream(bytes.NewReader(signatureBytes), 0)); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	v, _, _ := tx.RawSignatureValues()
@@ -209,8 +211,10 @@ func TestAccounts(t *testing.T) {
 	}
 	signedTx = resp.Data["signed_transaction"].(string)
 	signatureBytes, err = hexutil.Decode(signedTx)
-	err = tx.DecodeRLP(rlp.NewStream(bytes.NewReader(signatureBytes), 0))
 	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if err = tx.DecodeRLP(rlp.NewStream(bytes.NewReader(signatureBytes), 0)); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	v, _, _ = tx.RawSignatureValues()
@@ -228,10 +232,45 @@ func TestAccounts(t *testing.T) {
 		"chainId":  12345,
 	}
 	req.Data = data
+	if _, err = b.HandleRequest(context.Background(), req); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// sign EIP-1559 transaction
+	req = logical.TestRequest(t, logical.CreateOperation, "accounts/"+address1+"/sign")
+	req.Storage = storage
+	data = map[string]interface{}{
+		"data":                 dataToSign,
+		"to":                   "0xf809410b0d6f047c603deb311979cd413e025a84",
+		"gas":                  50000,
+		"nonce":                "0x4",
+		"maxFeePerGas":         "20000000000", // 20 gwei
+		"maxPriorityFeePerGas": "2000000000",  // 2 gwei
+		"chainId":              12345,
+	}
+	req.Data = data
 	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
+	signedTx = resp.Data["signed_transaction"].(string)
+	signatureBytes, err = hexutil.Decode(signedTx)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if err = tx.DecodeRLP(rlp.NewStream(bytes.NewReader(signatureBytes), 0)); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	// Verify it's an EIP-1559 transaction (type 2)
+	assert.Equal(uint8(2), tx.Type(), "Expected EIP-1559 transaction type 2")
+
+	// Verify sender using London signer
+	sender, err = types.Sender(types.NewLondonSigner(big.NewInt(12345)), &tx)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	assert.Equal(address1, strings.ToLower(sender.Hex()))
 
 	// delete key by name
 	req = logical.TestRequest(t, logical.DeleteOperation, "accounts/"+address1)
@@ -276,19 +315,19 @@ func TestAccounts(t *testing.T) {
 	address3 := res.Data["address"].(string)
 	assert.Equal("0xd5bcc62d9b1087a5cfec116c24d6187dd40fdf8a", address3)
 
-  // import key4 using '0x' prefix
-  req = logical.TestRequest(t, logical.UpdateOperation, "accounts")
-  req.Storage = storage
-  data = map[string]interface{}{
-    "privateKey": "0xec85999367d32fbbe02dd600a2a44550b95274cc67d14375a9f0bce233f13ad2",
-  }
-  req.Data = data
-  res, err = b.HandleRequest(context.Background(), req)
-  if err != nil {
-    t.Fatalf("err: %v", err)
-  }
-  address4 := res.Data["address"].(string)
-  assert.Equal("0xd5bcc62d9b1087a5cfec116c24d6187dd40fdf8a", address4)
+	// import key4 using '0x' prefix
+	req = logical.TestRequest(t, logical.UpdateOperation, "accounts")
+	req.Storage = storage
+	data = map[string]interface{}{
+		"privateKey": "0xec85999367d32fbbe02dd600a2a44550b95274cc67d14375a9f0bce233f13ad2",
+	}
+	req.Data = data
+	res, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	address4 := res.Data["address"].(string)
+	assert.Equal("0xd5bcc62d9b1087a5cfec116c24d6187dd40fdf8a", address4)
 
 	// export key3
 	req = logical.TestRequest(t, logical.ReadOperation, "export/accounts/0xd5bcc62d9b1087a5cfec116c24d6187dd40fdf8a")
@@ -299,11 +338,11 @@ func TestAccounts(t *testing.T) {
 	}
 	assert.Equal("ec85999367d32fbbe02dd600a2a44550b95274cc67d14375a9f0bce233f13ad2", res.Data["privateKey"])
 
-  // validate de-dup of same private keys imported multiple times
-  req = logical.TestRequest(t, logical.ListOperation, "accounts")
-  req.Storage = storage
-  resp, _ = b.HandleRequest(context.Background(), req)
-  assert.Equal(1, len(resp.Data))
+	// validate de-dup of same private keys imported multiple times
+	req = logical.TestRequest(t, logical.ListOperation, "accounts")
+	req.Storage = storage
+	resp, _ = b.HandleRequest(context.Background(), req)
+	assert.Equal(1, len(resp.Data))
 }
 
 func TestListAccountsFailure1(t *testing.T) {
@@ -347,20 +386,20 @@ func TestCreateAccountsFailure2(t *testing.T) {
 }
 
 func TestCreateAccountsFailure3(t *testing.T) {
-  assert := assert.New(t)
+	assert := assert.New(t)
 
-  b, _ := getBackend(t)
-  req := logical.TestRequest(t, logical.UpdateOperation, "accounts")
-  data := map[string]interface{}{
-    // use N for the secp256k1 curve to trigger an error
-    "privateKey": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-  }
-  req.Data = data
-  sm := newStorageMock()
-  req.Storage = sm
-  _, err := b.HandleRequest(context.Background(), req)
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.UpdateOperation, "accounts")
+	data := map[string]interface{}{
+		// use N for the secp256k1 curve to trigger an error
+		"privateKey": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+	}
+	req.Data = data
+	sm := newStorageMock()
+	req.Storage = sm
+	_, err := b.HandleRequest(context.Background(), req)
 
-  assert.Equal("Error reconstructing private key from input hex", err.Error())
+	assert.Equal("Error reconstructing private key from input hex", err.Error())
 }
 
 func TestReadAccountsFailure1(t *testing.T) {
@@ -586,6 +625,73 @@ func TestSignTxFailure7(t *testing.T) {
 
 	assert.Nil(resp)
 	assert.Equal("Error reconstructing private key from retrieved hex", err.Error())
+}
+
+func TestEIP1559TxFailure1(t *testing.T) {
+	assert := assert.New(t)
+
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.CreateOperation, "accounts/0xf809410b0d6f047c603deb311979cd413e025a84/sign")
+	sm := newStorageMock()
+	sm.switches[1] = 2
+	req.Storage = sm
+	req.Data["data"] = "0xabcd"
+	req.Data["gasPrice"] = "1000000000"
+	req.Data["maxFeePerGas"] = "2000000000"
+	resp, err := b.HandleRequest(context.Background(), req)
+
+	assert.Nil(resp)
+	assert.Equal("cannot specify both gasPrice and EIP-1559 fields (maxFeePerGas/maxPriorityFeePerGas)", err.Error())
+}
+
+func TestEIP1559TxFailure2(t *testing.T) {
+	assert := assert.New(t)
+
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.CreateOperation, "accounts/0xf809410b0d6f047c603deb311979cd413e025a84/sign")
+	sm := newStorageMock()
+	sm.switches[1] = 2
+	req.Storage = sm
+	req.Data["data"] = "0xabcd"
+	req.Data["maxPriorityFeePerGas"] = "2000000000"
+	resp, err := b.HandleRequest(context.Background(), req)
+
+	assert.Nil(resp)
+	assert.Equal("maxFeePerGas is required for EIP-1559 transactions", err.Error())
+}
+
+func TestEIP1559TxFailure3(t *testing.T) {
+	assert := assert.New(t)
+
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.CreateOperation, "accounts/0xf809410b0d6f047c603deb311979cd413e025a84/sign")
+	sm := newStorageMock()
+	sm.switches[1] = 2
+	req.Storage = sm
+	req.Data["data"] = "0xabcd"
+	req.Data["maxFeePerGas"] = "1000000000"
+	req.Data["maxPriorityFeePerGas"] = "2000000000"
+	resp, err := b.HandleRequest(context.Background(), req)
+
+	assert.Nil(resp)
+	assert.Equal("maxPriorityFeePerGas cannot be greater than maxFeePerGas", err.Error())
+}
+
+func TestEIP1559TxFailure4(t *testing.T) {
+	assert := assert.New(t)
+
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.CreateOperation, "accounts/0xf809410b0d6f047c603deb311979cd413e025a84/sign")
+	sm := newStorageMock()
+	sm.switches[1] = 2
+	req.Storage = sm
+	req.Data["data"] = "0xabcd"
+	req.Data["maxFeePerGas"] = "2000000000"
+	req.Data["chainId"] = "0"
+	resp, err := b.HandleRequest(context.Background(), req)
+
+	assert.Nil(resp)
+	assert.Equal("chain ID is required for EIP-1559 transactions", err.Error())
 }
 
 func contains(arr []*big.Int, value *big.Int) bool {

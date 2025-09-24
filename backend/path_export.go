@@ -15,7 +15,7 @@ func pathExport(b *backend) *framework.Path {
 
     `,
 		Fields: map[string]*framework.FieldSchema{
-			"name": &framework.FieldSchema{Type: framework.TypeString},
+			"name": {Type: framework.TypeString},
 		},
 		ExistenceCheck: b.pathExistenceCheck,
 		Callbacks: map[logical.Operation]framework.OperationFunc{

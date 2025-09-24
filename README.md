@@ -3,11 +3,19 @@
 [![Build Status](https://travis-ci.org/kaleido-io/vault-plugin-secrets-ethsign.svg?branch=master)](https://travis-ci.org/kaleido-io/vault-plugin-secrets-ethsign)
 [![codecov](https://codecov.io/gh/kaleido-io/vault-plugin-secrets-ethsign/branch/master/graph/badge.svg?token=3LlJ7aSeW2)](https://codecov.io/gh/kaleido-io/vault-plugin-secrets-ethsign)
 
-A HashiCorp Vault plugin that supports secp256k1 based signing, with an API interface that turns the vault into a software-based HSM device.
+A HashiCorp Vault plugin that supports secp256k1 based signing, with an API interface that turns the vault into a software-based HSM device. Supports both legacy Ethereum transactions and EIP-1559 (London Hard Fork) transactions with dynamic fee pricing.
 
 ![Overview](/resources/overview.png)
 
 The plugin only exposes the following endpoints to enable the client to generate signing keys for the secp256k1 curve suitable for signing Ethereum transactions, list existing signing keys by their names and addresses, and a `/sign` endpoint for each account. The generated private keys are saved in the vault as a secret. It never gives out the private keys.
+
+## Features
+
+- **Legacy Transaction Support**: Traditional Ethereum transactions using `gasPrice`
+- **EIP-1559 Support**: Modern transactions with `maxFeePerGas` and `maxPriorityFeePerGas`
+- **Backward Compatibility**: Existing integrations continue to work unchanged
+- **Automatic Transaction Type Detection**: Based on provided fields
+- **Comprehensive Validation**: Ensures proper field combinations and values
 
 ## Build
 These dependencies are needed:
@@ -269,6 +277,40 @@ To sign a contract deploy, simply skip the `to` parameter in the JSON payload.
 To use EIP155 signer, instead of Homestead signer, pass in `chainId` in the JSON payload.
 
 The `signed_transaction` value in the response is already RLP encoded and can be submitted to an Ethereum blockchain directly.
+
+### Sign an EIP-1559 Transaction
+This plugin supports EIP-1559 (London Hard Fork) transactions with dynamic fee pricing. To create an EIP-1559 transaction, use `maxFeePerGas` and `maxPriorityFeePerGas` instead of `gasPrice`.
+
+Using the REST API:
+```
+$  curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" http://localhost:8200/v1/ethereum/accounts/0xc9389f98b1c5f5f9b6b61b5e3769471d550ad596/sign -d '{"data":"0x60fe47b10000000000000000000000000000000000000000000000000000000000000014","gas":30791,"maxFeePerGas":"20000000000","maxPriorityFeePerGas":"2000000000","nonce":"0x0","to":"0xca0fe7354981aeb9d051e2f709055eb50b774087","chainId":"1"}' |jq
+
+{
+  "request_id": "4b68c813-eda9-e3c7-4651-e9dbc526bf47",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 0,
+  "data": {
+    "signed_transaction": "0x02f8731101808504a817c80085174876e80082782594ca0fe7354981aeb9d051e2f709055eb50b774087880de0b6b3a764000080a060fe47b10000000000000000000000000000000000000000000000000000000000000014",
+    "transaction_hash": "0x..."
+  },
+  "wrap_info": null,
+  "warnings": null,
+  "auth": null
+}
+```
+
+**EIP-1559 Transaction Fields:**
+- `maxFeePerGas`: Maximum fee per gas in wei (should be greater than `maxPriorityFeePerGas`)
+- `maxPriorityFeePerGas`: Maximum priority fee (tip) per gas in wei
+- `chainId`: Required for EIP-1559 transactions (cannot be 0)
+
+**Important Notes:**
+- EIP-1559 transactions are mutually exclusive with legacy `gasPrice` transactions
+- Both `maxFeePerGas` and `maxPriorityFeePerGas` must be provided together
+- `maxPriorityFeePerGas` cannot exceed `maxFeePerGas`
+- EIP-1559 transactions require a valid `chainId` (cannot be 0)
+- Legacy transactions using `gasPrice` remain fully supported for backward compatibility
 
 ## Access Policies
 The plugin's endpoint paths are designed such that admin-level access policies vs. user-level access policies can be easily separated.
