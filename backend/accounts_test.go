@@ -589,6 +589,7 @@ func TestSignTxFailure5(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
+	req.Data["value"] = "1000"
 	req.Data["chainId"] = "abcd"
 	resp, err := b.HandleRequest(context.Background(), req)
 
@@ -605,6 +606,7 @@ func TestSignTxFailure6(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
+	req.Data["value"] = "1000"
 	req.Data["gas"] = "abcd"
 	resp, err := b.HandleRequest(context.Background(), req)
 
@@ -621,6 +623,29 @@ func TestSignTxFailure7(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
+	req.Data["gasPrice"] = "1000"
+	req.Data["nonce"] = "abcd"
+	resp, err := b.HandleRequest(context.Background(), req)
+
+	assert.Nil(resp)
+	assert.Equal("invalid nonce", err.Error())
+}
+
+func TestSignTxFailure8(t *testing.T) {
+	assert := assert.New(t)
+
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.CreateOperation, "accounts/0xf809410b0d6f047c603deb311979cd413e025a84/sign")
+	sm := newStorageMock()
+	sm.switches[1] = 2
+	req.Storage = sm
+	req.Data["data"] = "0xabcd"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
+	req.Data["gasPrice"] = "1000"
+	req.Data["nonce"] = "10"
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
@@ -636,8 +661,10 @@ func TestEIP1559TxFailure1(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
-	req.Data["gasPrice"] = "1000000000"
-	req.Data["maxFeePerGas"] = "2000000000"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
+	req.Data["gasPrice"] = "10000"
+	req.Data["maxFeePerGas"] = "2000"
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
@@ -653,11 +680,12 @@ func TestEIP1559TxFailure2(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
-	req.Data["maxPriorityFeePerGas"] = "2000000000"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("maxFeePerGas is required for EIP-1559 transactions", err.Error())
+	assert.Equal("must specify either gasPrice (for legacy tx) or maxFeePerGas/maxPriorityFeePerGas (for EIP-1559 tx)", err.Error())
 }
 
 func TestEIP1559TxFailure3(t *testing.T) {
@@ -669,12 +697,13 @@ func TestEIP1559TxFailure3(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
-	req.Data["maxFeePerGas"] = "1000000000"
-	req.Data["maxPriorityFeePerGas"] = "2000000000"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
+	req.Data["maxPriorityFeePerGas"] = "2000"
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)
-	assert.Equal("maxPriorityFeePerGas cannot be greater than maxFeePerGas", err.Error())
+	assert.Equal("maxFeePerGas is required for EIP-1559 transactions", err.Error())
 }
 
 func TestEIP1559TxFailure4(t *testing.T) {
@@ -686,8 +715,28 @@ func TestEIP1559TxFailure4(t *testing.T) {
 	sm.switches[1] = 2
 	req.Storage = sm
 	req.Data["data"] = "0xabcd"
-	req.Data["maxFeePerGas"] = "2000000000"
-	req.Data["chainId"] = "0"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
+	req.Data["maxFeePerGas"] = "1000"
+	req.Data["maxPriorityFeePerGas"] = "2000"
+	resp, err := b.HandleRequest(context.Background(), req)
+
+	assert.Nil(resp)
+	assert.Equal("maxPriorityFeePerGas cannot be greater than maxFeePerGas", err.Error())
+}
+
+func TestEIP1559TxFailure5(t *testing.T) {
+	assert := assert.New(t)
+
+	b, _ := getBackend(t)
+	req := logical.TestRequest(t, logical.CreateOperation, "accounts/0xf809410b0d6f047c603deb311979cd413e025a84/sign")
+	sm := newStorageMock()
+	sm.switches[1] = 2
+	req.Storage = sm
+	req.Data["data"] = "0xabcd"
+	req.Data["value"] = "1000"
+	req.Data["gas"] = "21000"
+	req.Data["maxFeePerGas"] = "2000"
 	resp, err := b.HandleRequest(context.Background(), req)
 
 	assert.Nil(resp)

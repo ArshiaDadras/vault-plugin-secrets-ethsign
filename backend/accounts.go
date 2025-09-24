@@ -283,19 +283,19 @@ func (b *backend) signTx(ctx context.Context, req *logical.Request, data *framew
 		}
 	}
 
-	privateKey, err := crypto.HexToECDSA(account.PrivateKey)
-	if err != nil {
-		b.Logger().Error("Error reconstructing private key from retrieved hex", "error", err)
-		return nil, fmt.Errorf("error reconstructing private key from retrieved hex")
-	}
-	defer ZeroKey(privateKey)
-
 	nonceIn := ValidNumber(data.Get("nonce").(string))
 	if nonceIn == nil {
 		b.Logger().Error("Invalid nonce", "nonce", data.Get("nonce").(string))
 		return nil, fmt.Errorf("invalid nonce")
 	}
 	nonce := nonceIn.Uint64()
+
+	privateKey, err := crypto.HexToECDSA(account.PrivateKey)
+	if err != nil {
+		b.Logger().Error("Error reconstructing private key from retrieved hex", "error", err)
+		return nil, fmt.Errorf("error reconstructing private key from retrieved hex")
+	}
+	defer ZeroKey(privateKey)
 
 	// Create appropriate transaction type
 	var tx *types.Transaction
